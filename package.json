@@ -1,0 +1,19 @@
+{
+    "name": "rc-car",
+    "version": "1.0.0",
+    "description": "Simple RcCar created from Raspberry Pi Zero 2W",
+    "license": "MIT",
+    "author": {
+        "name": "Tomáš Filo"
+    },
+    "type": "commonjs",
+    "main": "index.html",
+    "scripts": {
+        "serve": "serve",
+        "build": "html-minifier-terser index.html -o index.min.html --collapse-whitespace --remove-comments --minify-css true --minify-js true"
+    },
+    "devDependencies": {
+        "html-minifier-terser": "^7.2.0",
+        "serve": "^14.2.5"
+    }
+}
