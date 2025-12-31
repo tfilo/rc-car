@@ -23,6 +23,8 @@ MOTOR_ZERO_DUTY_CYCLE = 0
 motor1a = PWM(Pin(14, Pin.OUT))
 motor1b = PWM(Pin(15, Pin.OUT))
 servo = Servo(pin_id=0)
+light_led = Pin(1, Pin.OUT)
+light_led.value(0)
 
 motor1a.freq(20000)
 motor1b.freq(20000)
@@ -43,6 +45,7 @@ voltage = get_battery_voltage()
 steering = STEERING_MID
 drive = 0
 horn = 0
+light = 0
 last_action_time = ticks_ms()
 
 
@@ -110,6 +113,11 @@ def servo_control_thread():
                 sleep_ms(10)
                 buzzer.deinit()
                 Pin(16, Pin.IN)
+                
+            if light == 1:
+                light_led.value(1)
+            else:
+                light_led.value(0)
 
         except Exception:
             pass
@@ -160,7 +168,7 @@ while True:
 
         elif request.startswith("POST /control"):
             match = search(
-                r"steering=([-0-9]+)&drive=([-0-9]+)&horn=([-0-9]+)", request
+                r"steering=([-0-9]+)&drive=([-0-9]+)&horn=([-0-9]+)&light=([-0-9]+)", request
             )
             if match:
                 steering_val = int(match.group(1))
@@ -176,9 +184,10 @@ while True:
                         drive_val, 1, 3, MOTOR_MIN_DUTY_CYCLE, MOTOR_MAX_DUTY_CYCLE
                     )
                 horn = int(match.group(3))
+                light = int(match.group(4))
 
                 last_action_time = ticks_ms()
-                print("STEERING:", steering, "DRIVE:", drive, "HORN:", horn)
+                print("STEERING:", steering, "DRIVE:", drive, "HORN:", horn, "LIGHT:", light)
 
             response = (
                 "HTTP/1.1 200 OK\r\n"
@@ -200,3 +209,4 @@ while True:
         except Exception:
             pass
     sleep_ms(10)
+
