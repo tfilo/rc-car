@@ -1,0 +1,116 @@
+* {
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-drag: none;
+}
+html,
+body {
+    margin: 0;
+    padding: 4px;
+    width: 100%;
+    height: 100%;
+    background: white;
+    overflow: hidden;
+    touch-action: none;
+    -ms-touch-action: none;
+}
+#up,
+#brake,
+#left,
+#right,
+#stop,
+#horn,
+#light {
+    position: absolute;
+    border-radius: 16px;
+    font-size: xx-large;
+    font-weight: 900;
+    color: black;
+    touch-action: manipulation;
+    background-color: lightgray;
+}
+#up,
+#brake,
+#left,
+#right {
+    width: 28%;
+    height: 40%;
+}
+#up {
+    top: 5%;
+    left: 36%;
+    border: 4px solid green;
+}
+#brake {
+    bottom: 5%;
+    left: 36%;
+    border: 4px solid blue;
+}
+#left {
+    top: 30%;
+    left: 5%;
+    border: 4px solid black;
+}
+#right {
+    top: 30%;
+    right: 5%;
+    border: 4px solid black;
+}
+#horn,
+#stop,
+#light {
+    width: 12%;
+    height: min(20vw, 20vh);
+    border: 4px solid black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+#horn {
+    top: 8%;
+    right: 5%;
+}
+#light {
+    top: 8%;
+    right: 21%;
+}
+#stop {
+    bottom: 8%;
+    right: 5%;
+    color: red;
+    font-size: large;
+}
+.status,
+.battery,
+.controls {
+    position: absolute;
+    left: 4px;
+    font-size: small;
+    display: flex;
+    flex-direction: column;
+}
+.status {
+    top: 4px;
+}
+.battery {
+    left: auto;
+    right: 4px;
+    flex-direction: row;
+    gap: 4px;
+}
+.controls {
+    bottom: 4px;
+}
+.controls_label {
+    display: inline-block;
+    width: 70px;
+}
+.crv {
+    display: inline-block;
+    padding-left: 8px;
+}

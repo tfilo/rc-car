@@ -14,12 +14,14 @@ Simple RcCar created from Raspberry Pi Zero 2W. After power up it creates a Wi�
 
 - `main.py` — main firmware logic (AP + HTTP server + motor/servo control).
 - `index.html` — controller web UI.
-- `assets/controller.png` — screenshot used above.
+- `style.css` — styling using pure css
+- `control.js` — javascript logic of controller
 
 ## Usage
 
 1. Flash MicroPython to the board.
-2. Copy `main.py` and `index.html` to the device filesystem.
+2. Run npm run build to create build folder with minified files
+2. Copy content of `build` directory to the Pico 2.
 3. Power up the car.
 4. On your phone/PC, connect to the Wi‑Fi AP (SSID: `RcCar`).
 5. Open `http://192.168.4.1` in a browser.
@@ -27,9 +29,8 @@ Simple RcCar created from Raspberry Pi Zero 2W. After power up it creates a Wi�
 ## Development (UI)
 
 - Run `npm run serve` to serve the UI locally in your browser for easier development.
-- Run `npm run build` to generate a minified `index.min.html`.
-	- The minified file is smaller, so it’s better to copy it to the Pico.
-	- Easiest workflow: build locally, then copy `index.min.html` to the Pico *as* `index.html` (overwrite the old one).
+- Run `npm run build` to generate a minified `build/index.html`, `build/control.js`, `build/style.css` and copy `main.py` to `build` directory too.
+- Run `npm run serve:prod` to serve the UI locally in your browser from builded files.
 
 ## Notes
 

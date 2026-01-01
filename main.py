@@ -2,10 +2,15 @@ from servo import Servo
 from machine import Pin, PWM, ADC
 from time import sleep_ms, ticks_ms, ticks_diff
 from math import floor
-from network import country, WLAN, AP_IF
-from socket import socket, getaddrinfo
 from ure import search
-from _thread import start_new_thread
+import network
+import rp2
+import socket
+import _thread
+# import os
+
+# logfile = open("log.txt", "a")
+# os.dupterm(logfile)
 
 # ====== WIFI ACCESS POINT CONSTANTS ======
 AP_SSID = "RcCar"
@@ -113,31 +118,33 @@ def servo_control_thread():
                 sleep_ms(10)
                 buzzer.deinit()
                 Pin(16, Pin.IN)
-                
+
             if light == 1:
                 light_led.value(1)
             else:
                 light_led.value(0)
 
-        except Exception:
-            pass
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            print("WARN: servo_control_thread error:", e)
         sleep_ms(20)
 
 
-start_new_thread(servo_control_thread, ())
+_thread.start_new_thread(servo_control_thread, ())
 
 # ====== CREATING AP ======
-country(WIFI_COUNTRY)
-ap = WLAN(AP_IF)
-ap.config(essid=AP_SSID, password=AP_PASSWORD, channel=WIFI_CHANNEL)
-ap.active(True)
+rp2.country(WIFI_COUNTRY)
+wlan = network.WLAN(network.AP_IF)
+wlan.config(essid=AP_SSID, password=AP_PASSWORD, channel=WIFI_CHANNEL)
+wlan.active(True)
 
-while not ap.active():
+while not wlan.active():
     sleep_ms(100)
 
-print("AP ready:", ap.ifconfig())
-print("AP SSID:", ap.config("ssid"))
-print("AP channel:", ap.config("channel"))
+print("AP ready:", wlan.ifconfig())
+print("AP SSID:", wlan.config("ssid"))
+print("AP channel:", wlan.config("channel"))
 
 
 # ====== LOAD STATIC FILE ======
@@ -147,28 +154,28 @@ def load_file(path):
 
 
 index_html = load_file("index.html")
+style_css = load_file("style.css")
+control_js = load_file("control.js")
 
 # ====== HTTP SERVER ======
-addr = getaddrinfo("0.0.0.0", 80)[0][-1]
-sock = socket()
-sock.bind(addr)
-sock.listen(1)
+address = socket.getaddrinfo("0.0.0.0", 80)[0][-1]
+s = socket.socket()
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(address)
+s.listen(1)
 
 print("HTTP server running")
 
 while True:
+    client = None
     try:
-        cl, addr = sock.accept()
-        request = cl.recv(1024).decode()
-
-        if request.startswith("GET / "):
-            response = (
-                "HTTP/1.1 200 OK\r\n" "Content-Type: text/html\r\n\r\n" + index_html
-            )
-
-        elif request.startswith("POST /control"):
+        client, address = s.accept()
+        request = client.recv(2048).decode()
+        response = None
+        if request.startswith("POST /control"):
             match = search(
-                r"steering=([-0-9]+)&drive=([-0-9]+)&horn=([-0-9]+)&light=([-0-9]+)", request
+                r"steering=([-0-9]+)&drive=([-0-9]+)&horn=([-0-9]+)&light=([-0-9]+)",
+                request,
             )
             if match:
                 steering_val = int(match.group(1))
@@ -187,7 +194,6 @@ while True:
                 light = int(match.group(4))
 
                 last_action_time = ticks_ms()
-                print("STEERING:", steering, "DRIVE:", drive, "HORN:", horn, "LIGHT:", light)
 
             response = (
                 "HTTP/1.1 200 OK\r\n"
@@ -195,18 +201,33 @@ while True:
                 '{"status":"ok", "battery":"' + str(voltage) + '"}'
             )
 
+        elif request.startswith("GET / "):
+            response = (
+                "HTTP/1.1 200 OK\r\n" "Content-Type: text/html\r\n\r\n" + index_html
+            )
+
+        elif request.startswith("GET /style.css "):
+            response = (
+                "HTTP/1.1 200 OK\r\n" "Content-Type: text/css\r\n\r\n" + style_css
+            )
+
+        elif request.startswith("GET /control.js "):
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: application/javascript\r\n\r\n" + control_js
+            )
+
         else:
             response = "HTTP/1.1 404 Not Found\r\n\r\n"
 
-        cl.send(response)
+        client.send(response)
+    except KeyboardInterrupt:
+        raise
     except Exception as e:
-        print("WARN: wifi/server thread restart", e)
-        pass
+        print("WARN: wifi/server thread restart:", e)
     finally:
         try:
-            if cl:
-                cl.close()
-        except Exception:
-            pass
-    sleep_ms(10)
-
+            if client:
+                client.close()
+        except Exception as e:
+            print("WARN: wifi/server client.close() error:", e)
