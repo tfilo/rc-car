@@ -3,6 +3,8 @@ from time import sleep_ms
 import network
 import rp2
 import socket
+import hashlib
+import binascii
 
 # ====== WIFI ACCESS POINT CONSTANTS ======
 AP_SSID = "RcCar"
@@ -54,56 +56,132 @@ class Server:
 
         # ====== HTTP SERVER ======
         address = socket.getaddrinfo("0.0.0.0", 80)[0][-1]
-        self.s = socket.socket()
+        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.s.bind(address)
         self.s.listen(1)
         print("HTTP server running")
+        self.client_socket = None  #
 
-    def accept_client(self, voltage):
-        client = self.s.accept()[0]
+    def __generate_ws_accept(self, key):
+        # WebSocket handshake requires a magic string
+        GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+        resp_key = hashlib.sha1((key + GUID).encode()).digest()
+        return binascii.b2a_base64(resp_key).decode().strip()
 
-        request = client.recv(2048).decode()
-        result = None
+    def __handle_handshake(self, client, request):
+        # Search Sec-WebSocket-Key
+        lines = request.split("\r\n")
+        key = ""
+        for line in lines:
+            if "Sec-WebSocket-Key:" in line:
+                key = line.split(":")[1].strip()
+                break
 
-        if request.startswith("POST /control"):
-            response = self.__success_response(voltage)
-            match = search(
-                r"steering=([-0-9]+)&drive=([-0-9]+)&horn=([-0-9]+)&light=([-0-9]+)",
-                request,
+        if key:
+            accept_key = self.__generate_ws_accept(key)
+            response = (
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                "Sec-WebSocket-Accept: " + accept_key + "\r\n\r\n"
             )
-            if match:
-                result = (
-                    int(match.group(1)),
-                    int(match.group(2)),
-                    bool(int(match.group(3))),
-                    bool(int(match.group(4))),
-                )
+            client.send(response)
+            return True
+        return False
 
-        elif request.startswith("GET / "):
+    def __receive_ws_frame(self, client):
+        """Very simplified reading of a WebSocket frame (text only)"""
+        try:
+            data = client.recv(64)
+            if not data:
+                return None
+
+            # MicroPython masking implementation (the browser always masks client-to-server data)
+            payload_len = data[1] & 127
+            masks = data[2:6]
+            payload = data[6 : 6 + payload_len]
+
+            decoded = bytes([payload[i] ^ masks[i % 4] for i in range(len(payload))])
+            return decoded.decode()
+        except Exception:
+            return None
+
+    def __handle_http(self, client, request):
+        """Processes classic GET requests for files"""
+        if request.startswith("GET / "):
             response = STATIC_INDEX_RESPONSE
-
         elif request.startswith("GET /style.css "):
             response = STATIC_STYLE_RESPONSE
-
         elif request.startswith("GET /control.js "):
             response = STATIC_CONTROL_RESPONSE
-
         else:
             response = STATIC_NOT_FOUND_RESPONSE
 
         client.send(response)
+        client.close()
+
+    def send_ws_frame(self, payload):
+        if self.client_socket is None:
+            return
+
         try:
-            client.close()
+            # payload is a string
+            payload_bytes = payload.encode("utf-8")
+            length = len(payload_bytes)
+
+            # Header construction:
+            # 0x81 = 10000001 (FIN bit set, opcode 1 = text)
+            header = bytearray([0x81])
+
+            if length <= 125:
+                header.append(length)
+            else:
+                # For messages 126 - 65535 bytes, the format is more complex
+                # For simplicity, we only handle short messages here
+                header.append(126)
+                header.extend(length.to_bytes(2, "big"))
+
+            self.client_socket.send(header + payload_bytes)
         except Exception as e:
-            print("WARN: wifi/server client.close() error:", e)
+            print("Error while sending frame:", e)
+            self.client_socket.close()
+            self.client_socket = None
 
-        return result
+    def listen_for_commands(self):
+        """Main loop that handles either a new HTTP request or an existing WS"""
+        if self.client_socket is None:
+            # Waiting for a new connection
+            client, addr = self.s.accept()
+            request = client.recv(1024).decode()
 
-    def __success_response(self, voltage):
-        response = (
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: application/json\r\n\r\n"
-            '{"status":"ok", "battery":"' + str(voltage) + '"}'
-        )
-        return response
+            if "Upgrade: websocket" in request:
+                if self.__handle_handshake(client, request):
+                    print("WebSocket connected!")
+                    self.client_socket = client
+                    # We do not close the socket!
+            else:
+                # Classic HTTP (GET / etc.)
+                self.__handle_http(client, request)
+        else:
+            # We have an active WebSocket, reading data
+            msg = self.__receive_ws_frame(self.client_socket)
+            if msg:
+                print("WS received:", msg)
+                # Here you process JSON or the string "steering,drive,horn,light"
+                match = search(
+                    r"steering=([-0-9]+)&drive=([-0-9]+)&horn=([-0-9]+)&light=([-0-9]+)",
+                    msg,
+                )
+                if match:
+                    result = (
+                        int(match.group(1)),
+                        int(match.group(2)),
+                        bool(int(match.group(3))),
+                        bool(int(match.group(4))),
+                    )
+                    return result
+            else:
+                self.client_socket.close()
+                self.client_socket = None
+        return None

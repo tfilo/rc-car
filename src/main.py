@@ -24,22 +24,21 @@ rc_car = RcCar(
 # ====== SERVER ======
 server = Server()
 
+counter = 0
+voltage = battery.read_voltage()
 
 while True:
-    client = None
-    counter = 0
-    voltage = battery.read_voltage()
     try:
         counter += 1
 
         if counter > 1000:
-            voltage = battery.read_voltage()
             counter = 0
+            voltage = battery.read_voltage()
 
-        request = server.accept_client(voltage)
-
+        request = server.listen_for_commands()
         if request is not None:
             rc_car.update(request[0], request[1], request[2], request[3])
+        server.send_ws_frame(str(voltage))
 
     except KeyboardInterrupt:
         raise

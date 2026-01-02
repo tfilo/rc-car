@@ -3,7 +3,7 @@ const HORN_OFF = 0;
 const HORN_ON = 1;
 const LIGHT_OFF = 0;
 const LIGHT_ON = 1;
-const WAIT_MS = 50;
+const WAIT_MS = 25;
 const S_MIN = 0;
 const S_MAX = 100;
 const REVERSE = -1;
@@ -23,27 +23,33 @@ let lastSuccessfullApiCall = Date.now();
 
 /** Control functions */
 let steeringInterval = null;
+let steeringTimeout = null;
 
-function steeringReleased() {
+function steeringResetTimeout() {
+    clearTimeout(steeringTimeout);
     clearInterval(steeringInterval);
 }
 
 function pressedLeft() {
-    clearInterval(steeringInterval);
-    steeringInterval = setInterval(() => {
-        left();
+    steeringResetTimeout();
+    steeringTimeout = setTimeout(() => {
+        steeringInterval = setInterval(() => {
+            left();
+        }, 50);
     }, 200);
 }
 
 function pressedRight() {
-    clearInterval(steeringInterval);
-    steeringInterval = setInterval(() => {
-        right();
+    steeringResetTimeout();
+    steeringTimeout = setTimeout(() => {
+        steeringInterval = setInterval(() => {
+            right();
+        }, 50);
     }, 200);
 }
 
 function forward() {
-    steeringReleased();
+    steeringResetTimeout();
     if (drive === REVERSE) {
         drive = STOP;
     } else {
@@ -52,7 +58,7 @@ function forward() {
 }
 
 function reverse() {
-    steeringReleased();
+    steeringResetTimeout();
     if (drive > STOP) {
         drive = Math.max(drive - 1, STOP);
     } else {
@@ -61,20 +67,20 @@ function reverse() {
 }
 
 function stop() {
-    steeringReleased();
+    steeringResetTimeout();
     drive = STOP;
 }
 
 function left() {
-    steering = Math.max(steering - 10, S_MIN);
+    steering = Math.max(steering - 5, S_MIN);
 }
 
 function right() {
-    steering = Math.min(steering + 10, S_MAX);
+    steering = Math.min(steering + 5, S_MAX);
 }
 
 function honk() {
-    steeringReleased();
+    steeringResetTimeout();
     horn = HORN_ON;
     clearTimeout(horntimeout);
     horntimeout = setTimeout(() => {
@@ -83,12 +89,12 @@ function honk() {
 }
 
 function lightToggle() {
-    steeringReleased();
+    steeringResetTimeout();
     light = light === LIGHT_OFF ? LIGHT_ON : LIGHT_OFF;
 }
 
 function reset() {
-    steeringReleased();
+    steeringResetTimeout();
     steering = S_MAX / 2;
     drive = STOP;
     horn = HORN_OFF;
@@ -97,51 +103,58 @@ function reset() {
 
 /** Send control data to server */
 async function send() {
-    const startTime = Date.now();
-    let elapsedTime = 0;
-    try {
-        /** If control has no connection for more than 1 second, reset controls */
+    if (socket && socket.readyState === WebSocket.OPEN) {
         if (Date.now() - lastSuccessfullApiCall > 1000) {
             reset();
         }
-        const controller = new AbortController();
-        setTimeout(() => controller.abort(), 300);
-        const res = await fetch(`/control?steering=${steering}&drive=${drive}&horn=${horn}&light=${light}`, {
-            method: 'POST',
-            signal: controller.signal
-        });
-        elapsedTime = Date.now() - startTime;
-        document.getElementById('status').innerHTML = res.status;
-        if (res.ok) {
-            try {
-                lastSuccessfullApiCall = Date.now();
-                const data = await res.json();
-                const rawBattery = data.battery;
-                if (rawBattery && !isNaN(+rawBattery)) {
-                    const batteryVoltage = (+rawBattery).toFixed(2);
-                    document.getElementById('battery').innerHTML = batteryVoltage;
-                }
-            } catch (e) {
-                console.warn('Invalid JSON response', e);
-            }
+        try {
+            socket.send(`steering=${steering}&drive=${drive}&horn=${horn}&light=${light}`);
+            lastSuccessfullApiCall = Date.now();
+            document.getElementById('status').innerHTML = 'OK';
+        } catch (error) {
+            document.getElementById('status').innerHTML = error.name;
+        } finally {
+            requestCount++;
+            setTimeout(() => {
+                send();
+            }, WAIT_MS);
         }
-    } catch (error) {
-        document.getElementById('status').innerHTML = error.name;
-    } finally {
-        requestCount++;
-        totalElapsedTime += elapsedTime;
-        setTimeout(() => {
-            send();
-        }, Math.min(Math.max(10, WAIT_MS - elapsedTime), WAIT_MS));
+    } else {
+        document.getElementById('status').innerHTML = 'Offline';
     }
 }
+
+let socket = new WebSocket('ws://' + window.location.hostname + '/ws');
+socket.onopen = function () {
+    send();
+};
+socket.onmessage = function (event) {
+    const rawBattery = event.data;
+    if (rawBattery && !isNaN(+rawBattery)) {
+        const batteryVoltage = (+rawBattery).toFixed(2);
+        document.getElementById('battery').innerHTML = batteryVoltage;
+    }
+};
+socket.onclose = function () {
+    // if socket closes, try to reconnect after a short delay
+    setTimeout(() => {
+        if (!socket || socket.readyState === WebSocket.CLOSED) {
+            socket = new WebSocket('ws://' + window.location.hostname + '/ws');
+        }
+    }, 100);
+};
+
+socket.onerror = function () {
+    try {
+        // on error, close the socket to trigger reconnect
+        socket.close();
+    } catch (e) {}
+};
 
 /** Update UI periodically */
 setInterval(() => {
     document.getElementById('requestCount').innerHTML = requestCount;
-    document.getElementById('elapsedTime').innerHTML = Math.round(totalElapsedTime / requestCount) + ' ms';
     requestCount = 0;
-    totalElapsedTime = 0;
 }, 1000);
 
 setInterval(() => {
@@ -158,7 +171,6 @@ setInterval(() => {
 }, 100);
 
 /** Keyboard controls */
-window.addEventListener('DOMContentLoaded', send);
 document.getElementById('light').addEventListener('click', lightToggle);
 document.getElementById('horn').addEventListener('click', honk);
 document.getElementById('up').addEventListener('click', forward);
@@ -169,11 +181,11 @@ document.getElementById('stop').addEventListener('click', stop);
 
 document.getElementById('right').addEventListener('pointerdown', pressedRight);
 document.getElementById('left').addEventListener('pointerdown', pressedLeft);
-document.getElementById('right').addEventListener('pointerup', steeringReleased);
-document.getElementById('left').addEventListener('pointerup', steeringReleased);
-document.getElementById('right').addEventListener('pointerleave', steeringReleased);
-document.getElementById('left').addEventListener('pointerleave', steeringReleased);
-document.getElementById('right').addEventListener('pointerout', steeringReleased);
-document.getElementById('left').addEventListener('pointerout', steeringReleased);
-document.getElementById('right').addEventListener('pointercancel', steeringReleased);
-document.getElementById('left').addEventListener('pointercancel', steeringReleased);
+document.getElementById('right').addEventListener('pointerup', steeringResetTimeout);
+document.getElementById('left').addEventListener('pointerup', steeringResetTimeout);
+document.getElementById('right').addEventListener('pointerleave', steeringResetTimeout);
+document.getElementById('left').addEventListener('pointerleave', steeringResetTimeout);
+document.getElementById('right').addEventListener('pointerout', steeringResetTimeout);
+document.getElementById('left').addEventListener('pointerout', steeringResetTimeout);
+document.getElementById('right').addEventListener('pointercancel', steeringResetTimeout);
+document.getElementById('left').addEventListener('pointercancel', steeringResetTimeout);
