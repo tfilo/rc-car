@@ -11,7 +11,7 @@
     "scripts": {
         "serve": "serve .",
         "serve:prod": "serve ./build",
-        "build": "mkdir -p build && minify index.html > build/index.html && minify style.css > build/style.css && minify control.js > build/control.js && cp main.py build/main.py"
+        "build": "mkdir -p build && minify static/index.html > build/index.html && minify static/style.css > build/style.css && minify static/control.js > build/control.js && cp src/*.py build/"
     },
     "devDependencies": {
         "minify": "^14.1.0",

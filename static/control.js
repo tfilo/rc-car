@@ -105,7 +105,7 @@ async function send() {
             reset();
         }
         const controller = new AbortController();
-        setTimeout(() => controller.abort(), 200);
+        setTimeout(() => controller.abort(), 300);
         const res = await fetch(`/control?steering=${steering}&drive=${drive}&horn=${horn}&light=${light}`, {
             method: 'POST',
             signal: controller.signal
@@ -113,18 +113,17 @@ async function send() {
         elapsedTime = Date.now() - startTime;
         document.getElementById('status').innerHTML = res.status;
         if (res.ok) {
-            lastSuccessfullApiCall = Date.now();
-            res.json()
-                .then((data) => {
-                    const rawBattery = data.battery;
-                    if (rawBattery && !isNaN(+rawBattery)) {
-                        const batteryVoltage = (+rawBattery).toFixed(2);
-                        document.getElementById('battery').innerHTML = batteryVoltage;
-                    }
-                })
-                .catch(() => {
-                    console.warn('Invalid JSON response');
-                });
+            try {
+                lastSuccessfullApiCall = Date.now();
+                const data = await res.json();
+                const rawBattery = data.battery;
+                if (rawBattery && !isNaN(+rawBattery)) {
+                    const batteryVoltage = (+rawBattery).toFixed(2);
+                    document.getElementById('battery').innerHTML = batteryVoltage;
+                }
+            } catch (e) {
+                console.warn('Invalid JSON response', e);
+            }
         }
     } catch (error) {
         document.getElementById('status').innerHTML = error.name;
@@ -133,7 +132,7 @@ async function send() {
         totalElapsedTime += elapsedTime;
         setTimeout(() => {
             send();
-        }, Math.min(Math.max(0, WAIT_MS - elapsedTime), WAIT_MS));
+        }, Math.min(Math.max(10, WAIT_MS - elapsedTime), WAIT_MS));
     }
 }
 
