@@ -2,7 +2,6 @@ from time import sleep_ms
 from rc_car import RcCar
 from battery import Battery
 from server import Server
-
 # import os
 
 # logfile = open("log.txt", "a")
@@ -46,3 +45,4 @@ while True:
         print("WARN: wifi/server thread restart:", e)
 
     sleep_ms(10)
+

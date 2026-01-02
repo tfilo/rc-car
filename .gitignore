@@ -1,3 +1,4 @@
 node_modules
 index.min.html
 build/**/*.*
+ota.tar.gz

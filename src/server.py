@@ -5,6 +5,8 @@ import rp2
 import socket
 import hashlib
 import binascii
+import machine
+import gzip
 
 # ====== WIFI ACCESS POINT CONSTANTS ======
 AP_SSID = "RcCar"
@@ -107,7 +109,7 @@ class Server:
         except Exception:
             return None
 
-    def __handle_http(self, client, request):
+    def __handle_http(self, client, request, body_data=b""):
         """Processes classic GET requests for files"""
         if request.startswith("GET / "):
             response = STATIC_INDEX_RESPONSE
@@ -115,6 +117,84 @@ class Server:
             response = STATIC_STYLE_RESPONSE
         elif request.startswith("GET /control.js "):
             response = STATIC_CONTROL_RESPONSE
+        elif request.startswith("POST /update "):
+            try:
+                print("OTA Update")
+                content_length = 0
+                for line in request.split("\r\n"):
+                    if "Content-Length:" in line:
+                        content_length = int(line.split(":")[1].strip())
+                        break
+
+                print("Expected content length:", content_length)
+                # Read the binary body (ota.tar.gz)
+                with open("ota.tar.gz", "wb") as f:
+                    if body_data:
+                        f.write(body_data)
+                        remaining = content_length - len(body_data)
+                    else:
+                        remaining = content_length
+
+                    while remaining > 0:
+                        chunk = client.recv(min(1024, remaining))
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        remaining -= len(chunk)
+                        
+                print("File received:")
+
+                # Extract the tar.gz file
+                with gzip.open("ota.tar.gz", "rb") as f:
+                    while True:
+                        header = f.read(512)
+                        if not header or len(header) < 512:
+                            break
+
+                        # Check for end of archive (empty block)
+                        if header == b"\x00" * 512:
+                            break
+
+                        # Parse TAR header
+                        name = header[:100].rstrip(b"\x00").decode().strip()
+                        size = int(header[124:136].rstrip(b"\x00 "), 8)
+                        file_type = header[156]
+
+                        # Force save to root by stripping paths
+                        name = name.split("/")[-1]
+
+                        # Type '0' (48) or \0 (0) is a normal file
+                        if file_type in (0, 48) and name:
+                            print("Extracting:", name)
+                            with open(name, "wb") as out_f:
+                                remaining = size
+                                while remaining > 0:
+                                    chunk = f.read(min(remaining, 1024))
+                                    if not chunk:
+                                        break
+                                    out_f.write(chunk)
+                                    remaining -= len(chunk)
+                        else:
+                            # Skip data for directories or other types
+                            remaining = size
+                            while remaining > 0:
+                                chunk = f.read(min(remaining, 1024))
+                                remaining -= len(chunk)
+
+                        # Consume padding to align to 512-byte block
+                        padding = (512 - (size % 512)) % 512
+                        if padding:
+                            f.read(padding)
+
+                client.send("HTTP/1.1 200 OK\r\n\r\nOTA Success. Rebooting...")
+                client.close()
+                sleep_ms(1000)
+                machine.reset()
+                return
+
+            except Exception as e:
+                print("OTA Error:", e)
+                response = "HTTP/1.1 500 Server Error\r\n\r\nOTA Failed"
         else:
             response = STATIC_NOT_FOUND_RESPONSE
 
@@ -153,7 +233,19 @@ class Server:
         if self.client_socket is None:
             # Waiting for a new connection
             client, addr = self.s.accept()
-            request = client.recv(1024).decode()
+            data = client.recv(1024)
+
+            # Separate headers from body to avoid UnicodeError
+            h_end = data.find(b"\r\n\r\n")
+            if h_end != -1:
+                request = data[: h_end + 4].decode()
+                body_data = data[h_end + 4 :]
+            else:
+                try:
+                    request = data.decode()
+                except:
+                    request = data.decode("utf-8", "ignore")
+                body_data = b""
 
             if "Upgrade: websocket" in request:
                 if self.__handle_handshake(client, request):
@@ -162,13 +254,19 @@ class Server:
                     # We do not close the socket!
             else:
                 # Classic HTTP (GET / etc.)
-                self.__handle_http(client, request)
+                self.__handle_http(client, request, body_data)
         else:
             # We have an active WebSocket, reading data
             msg = self.__receive_ws_frame(self.client_socket)
             if msg:
                 print("WS received:", msg)
                 # Here you process JSON or the string "steering,drive,horn,light"
+                if msg == "exit":
+                    print("WS closing on client request")
+                    self.client_socket.close()
+                    self.client_socket = None
+                    return None
+                
                 match = search(
                     r"steering=([-0-9]+)&drive=([-0-9]+)&horn=([-0-9]+)&light=([-0-9]+)",
                     msg,
@@ -182,6 +280,8 @@ class Server:
                     )
                     return result
             else:
+                print("WS closing")
                 self.client_socket.close()
                 self.client_socket = None
         return None
+
