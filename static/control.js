@@ -101,16 +101,15 @@ function reset() {
     light = LIGHT_OFF;
 }
 
+let socket = new WebSocket('ws://' + window.location.hostname + '/ws');
+
 /** Send control data to server */
 async function send() {
     if (socket && socket.readyState === WebSocket.OPEN) {
-        if (Date.now() - lastSuccessfullApiCall > 1000) {
-            reset();
-        }
         try {
             socket.send(`steering=${steering}&drive=${drive}&horn=${horn}&light=${light}`);
-            lastSuccessfullApiCall = Date.now();
             document.getElementById('status').innerHTML = 'OK';
+            lastSuccessfullApiCall = Date.now();
         } catch (error) {
             document.getElementById('status').innerHTML = error.name;
         } finally {
@@ -124,8 +123,8 @@ async function send() {
     }
 }
 
-let socket = new WebSocket('ws://' + window.location.hostname + '/ws');
 socket.onopen = function () {
+    document.getElementById('connect').style.display = 'none';
     send();
 };
 socket.onmessage = function (event) {
@@ -151,13 +150,25 @@ socket.onerror = function () {
     } catch (e) {}
 };
 
+function reopenSocket() {
+    if (!socket || socket.readyState === WebSocket.CLOSED) {
+        socket = new WebSocket('ws://' + window.location.hostname + '/ws');
+    }
+}
+
 /** Update UI periodically */
 setInterval(() => {
     document.getElementById('requestCount').innerHTML = requestCount;
     requestCount = 0;
+    if (!socket || socket.readyState === WebSocket.CLOSED) {
+        document.getElementById('connect').style.display = 'inline-block';
+    }
 }, 1000);
 
 setInterval(() => {
+    if (Date.now() - lastSuccessfullApiCall > 1000) {
+        // reset();
+    }
     document.getElementById('drive').value = drive + 1;
     document.getElementById('steering').value = steering;
     document.getElementById('drive_value').innerHTML = drive;
@@ -171,6 +182,7 @@ setInterval(() => {
 }, 100);
 
 /** Keyboard controls */
+document.getElementById('connect').addEventListener('click', reopenSocket);
 document.getElementById('light').addEventListener('click', lightToggle);
 document.getElementById('horn').addEventListener('click', honk);
 document.getElementById('up').addEventListener('click', forward);
@@ -189,3 +201,21 @@ document.getElementById('right').addEventListener('pointerout', steeringResetTim
 document.getElementById('left').addEventListener('pointerout', steeringResetTimeout);
 document.getElementById('right').addEventListener('pointercancel', steeringResetTimeout);
 document.getElementById('left').addEventListener('pointercancel', steeringResetTimeout);
+
+window.addEventListener(
+    'contextmenu',
+    function (e) {
+        e.preventDefault();
+    },
+    false
+);
+window.addEventListener(
+    'touchstart',
+    function (e) {
+        if (e.touches.length > 1) {
+            e.preventDefault();
+        }
+    },
+    { passive: false }
+);
+element.addEventListener('contextmenu', (e) => e.preventDefault());

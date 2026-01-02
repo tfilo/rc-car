@@ -2,11 +2,15 @@
     user-select: none;
     -webkit-touch-callout: none;
     -webkit-user-select: none;
+    -khtml-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
     -webkit-user-drag: none;
+    touch-action: none;
+    -ms-touch-action: none;
+    pointer-events: none;
 }
 html,
 body {
@@ -14,10 +18,9 @@ body {
     padding: 4px;
     width: 100%;
     height: 100%;
-    background: white;
+    background: whitesmoke;
+    color: black;
     overflow: hidden;
-    touch-action: none;
-    -ms-touch-action: none;
 }
 #up,
 #brake,
@@ -25,14 +28,16 @@ body {
 #right,
 #stop,
 #horn,
-#light {
+#light,
+#connect {
     position: absolute;
     border-radius: 16px;
     font-size: xx-large;
     font-weight: 900;
     color: black;
-    touch-action: manipulation;
     background-color: lightgray;
+    cursor: pointer;
+    pointer-events: all;
 }
 #up,
 #brake,
@@ -63,7 +68,8 @@ body {
 }
 #horn,
 #stop,
-#light {
+#light,
+#connect {
     width: 12%;
     height: min(20vw, 20vh);
     border: 4px solid black;
@@ -79,13 +85,20 @@ body {
     top: 8%;
     right: 21%;
 }
+#connect {
+    top: 8%;
+    left: 5%;
+    width: 28%;
+    background-color: lightskyblue;
+    display: none;
+}
 #stop {
-    bottom: 8%;
+    bottom: 5%;
     right: 5%;
     color: red;
     font-size: large;
 }
-.status,
+.request,
 .battery,
 .controls {
     position: absolute;
@@ -94,7 +107,7 @@ body {
     display: flex;
     flex-direction: column;
 }
-.status {
+.request {
     top: 4px;
 }
 .battery {
