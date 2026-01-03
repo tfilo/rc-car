@@ -1,4 +1,7 @@
-* {
+html,
+body,
+div,
+span {
     user-select: none;
     -webkit-touch-callout: none;
     -webkit-user-select: none;
@@ -12,27 +15,20 @@
     -ms-touch-action: none;
     pointer-events: none;
 }
+
 html,
 body {
     margin: 0;
-    padding: 4px;
+    padding: 0;
     width: 100%;
     height: 100%;
     background: whitesmoke;
     color: black;
     overflow: hidden;
 }
-#up,
-#brake,
-#left,
-#right,
-#stop,
-#horn,
-#light,
-#update,
-#connect,
-#log {
-    position: absolute;
+
+button {
+    flex: 1;
     border-radius: 16px;
     font-size: xx-large;
     font-weight: 900;
@@ -40,117 +36,91 @@ body {
     background-color: lightgray;
     cursor: pointer;
     pointer-events: all;
+    border: 2px solid gray;
 }
-#up,
-#brake,
-#left,
-#right {
-    width: 28%;
-    height: 40%;
+
+button:active {
+    border-color: black;
 }
-#up {
-    top: 5%;
-    left: 36%;
-    border: 4px solid green;
-}
-#brake {
-    bottom: 5%;
-    left: 36%;
-    border: 4px solid blue;
-}
-#left {
-    top: 30%;
-    left: 5%;
-    border: 4px solid black;
-}
-#right {
-    top: 30%;
-    right: 5%;
-    border: 4px solid black;
-}
-#horn,
-#stop,
-#light,
-#connect,
-#log,
-#update {
-    width: 12%;
-    height: min(20vw, 20vh);
-    border: 4px solid black;
-    display: flex;
+
+.overlay_update,
+.overlay_connect,
+.overlay_download {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    font-size: xx-large;
+    font-weight: 900;
     justify-content: center;
     align-items: center;
+    z-index: 1000;
+    pointer-events: all;
 }
-#horn {
-    top: 8%;
-    right: 5%;
-}
-#light {
-    top: 8%;
-    right: 21%;
-}
-#stop {
-    bottom: 5%;
-    right: 5%;
-    color: red;
-    font-size: large;
-}
-#connect {
-    top: 8%;
-    left: 5%;
-    border-width: 2px;
-    width: auto;
-    height: auto;
-    padding: 20px;
-    line-height: 20px;
-    font-size: 20px;
-}
-#update {
-    bottom: 8%;
-    left: 5%;
-    border-width: 2px;
-    width: auto;
-    height: auto;
-    padding: 20px;
-    line-height: 20px;
-    font-size: 20px;
-}
-#log {
-    bottom: 8%;
-    left: calc(5% + 70px);
-    border-width: 2px;
-    width: auto;
-    height: auto;
-    padding: 20px;
-    line-height: 20px;
-    font-size: 20px;
-}
-.request,
-.battery,
-.controls {
-    position: absolute;
-    left: 4px;
-    font-size: small;
+
+.main {
     display: flex;
     flex-direction: column;
+    width: 100%;
+    height: 100%;
+    gap: 1%;
 }
-.request {
-    top: 4px;
+
+.main > .header {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 4%;
+    font-size: 12px;
+    align-items: center;
 }
-.battery {
-    left: auto;
-    right: 4px;
-    flex-direction: row;
-    gap: 4px;
+
+.main > .footer {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 4%;
+    font-size: 12px;
+    align-items: center;
 }
-.controls {
-    bottom: 4px;
+
+.buttons {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 4%;
 }
-.controls_label {
-    display: inline-block;
-    width: 70px;
+
+.buttons > .top,
+.buttons > .middle,
+.buttons > .bottom {
+    gap: 10%;
+    display: flex;
+    flex: 1;
+    padding: 0 4%;
+    justify-items: center;
 }
-.crv {
-    display: inline-block;
-    padding-left: 8px;
+
+.buttons > .middle {
+    gap: 30%;
+    margin: 0 10%;
+    max-width: 100%;
+}
+
+.buttons > .top > .left,
+.buttons > .top > .center,
+.buttons > .top > .right {
+    display: flex;
+    flex: 1;
+    gap: 4%;
+}
+
+.buttons > .bottom > .left,
+.buttons > .bottom > .center,
+.buttons > .bottom > .right {
+    display: flex;
+    flex: 1;
+    gap: 4%;
 }

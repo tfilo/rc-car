@@ -4,6 +4,7 @@ const HORN_ON = 1;
 const LIGHT_OFF = 0;
 const LIGHT_ON = 1;
 const WAIT_MS = 25;
+const WAIT_MS_IF_NO_SOCKET = 100;
 const S_MIN = 0;
 const S_MAX = 100;
 const REVERSE = -1;
@@ -105,13 +106,20 @@ function reset() {
 }
 
 let socket = null;
+let socketSendInterval = null;
 function openSocket() {
+    document.getElementById('connect').style.display = 'none';
+    document.querySelector('.overlay_connect').style.display = 'flex';
     if (!socket || socket.readyState !== WebSocket.OPEN) {
         socket = new WebSocket('ws://' + window.location.hostname + '/ws');
 
         socket.onopen = function () {
-            document.getElementById('connect').style.display = 'none';
-            send();
+            console.log('WebSocket connection opened');
+            document.querySelector('.overlay_connect').style.display = 'none';
+            clearInterval(socketSendInterval);
+            socketSendInterval = setInterval(() => {
+                send();
+            }, WAIT_MS);
         };
 
         socket.onmessage = function (event) {
@@ -123,22 +131,26 @@ function openSocket() {
         };
 
         socket.onclose = function () {
+            console.log('WebSocket connection closed');
             // if socket closes, try to reconnect after a short delay
+            clearInterval(socketSendInterval);
             socket = null;
-            document.getElementById('connect').style.display = 'inline-block';
             if (keepOpen) {
                 setTimeout(() => {
                     openSocket();
-                }, 50);
+                }, WAIT_MS * 2);
             }
         };
 
-        socket.onerror = function () {
+        socket.onerror = function (error) {
+            console.log('WebSocket connection error', error);
             try {
                 // on error, close the socket to trigger reconnect
                 socket.close();
             } catch (e) {}
         };
+    } else {
+        document.querySelector('.overlay_connect').style.display = 'none';
     }
 }
 
@@ -149,13 +161,9 @@ async function send() {
             socket.send(`steering=${steering}&drive=${drive}&horn=${horn}&light=${light}`);
             document.getElementById('status').innerHTML = 'OK';
             lastSuccessfullApiCall = Date.now();
+            requestCount++;
         } catch (error) {
             document.getElementById('status').innerHTML = error.name;
-        } finally {
-            requestCount++;
-            setTimeout(() => {
-                send();
-            }, WAIT_MS);
         }
     } else {
         document.getElementById('status').innerHTML = 'Offline';
@@ -164,55 +172,65 @@ async function send() {
 }
 
 async function update(event) {
-    const file = event.target.files[0];
+    try {
+        const file = event.target.files[0];
 
-    if (file) {
-        if (confirm('Are you sure you want to upload the update? The car will restart after a successful update.')) {
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                keepOpen = false;
-                socket.send('exit');
-                socket.close();
-                socket = null;
-                await new Promise((resolve) => setTimeout(resolve, 2000));
-            }
-            await fetch('/update', {
-                method: 'POST',
-                body: file
-            })
-                .then((response) => {
-                    if (response.ok) {
-                        alert('Update successful! The car will restart now.');
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 5000);
-                    } else {
-                        alert('Update failed. Please try again.');
-                    }
-                })
-                .catch((error) => {
-                    alert('Error during update: ' + error.message);
+        if (file) {
+            if (confirm('Are you sure you want to upload the update? The car will restart after a successful update.')) {
+                document.querySelector('.overlay_update').style.display = 'flex';
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    keepOpen = false;
+                    socket.send('exit');
+                    socket.close();
+                    socket = null;
+                    await new Promise((resolve) => setTimeout(resolve, 2000));
+                }
+                const response = await fetch('/update', {
+                    method: 'POST',
+                    body: file
                 });
+
+                if (response.ok) {
+                    alert('Update successful! The car will restart now.');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 5000);
+                } else {
+                    throw new Error('Update failed. Please try again.');
+                }
+            }
         }
+    } catch (error) {
+        keepOpen = true;
+        alert('Error during update: ' + error.message);
     }
 }
 
 async function downloadLog() {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-        keepOpen = false;
-        socket.send('exit');
-        socket.close();
-        socket = null;
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            document.querySelector('.overlay_download').style.display = 'flex';
+            keepOpen = false;
+            socket.send('exit');
+            socket.close();
+            socket = null;
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+        window.open('/log.txt', '_blank');
+    } finally {
+        keepOpen = true;
+        document.querySelector('.overlay_download').style.display = 'none';
     }
-    window.open('/log.txt', '_blank');
 }
 
 /** Update UI periodically */
 setInterval(() => {
     document.getElementById('requestCount').innerHTML = requestCount;
     requestCount = 0;
-    if (!socket || socket.readyState === WebSocket.CLOSED) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
         document.getElementById('connect').style.display = 'inline-block';
+    } else {
+        document.getElementById('connect').style.display = 'none';
     }
 }, 1000);
 
@@ -258,3 +276,7 @@ document.getElementById('update').addEventListener('click', () => {
 });
 document.getElementById('autoupdate').addEventListener('change', update);
 document.getElementById('log').addEventListener('click', downloadLog);
+
+window.onload = () => {
+    openSocket();
+};

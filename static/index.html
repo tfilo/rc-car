@@ -2,40 +2,67 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <meta
+            name="viewport"
+            content="width=device-width, height=device-height, minimum-stace=1.0, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+        />
+        <meta name="HandheldFriendly" content="true" />
         <title>RC-Car</title>
         <link rel="stylesheet" href="./style.css" />
         <script src="./control.js" defer></script>
     </head>
-    <body id="body">
-        <div class="request">
-            <span>Status: <span id="status"></span></span>
-            <span>Request: <span id="requestCount">0</span> req/s</span>
-        </div>
-        <div class="battery">&#128267; <span id="battery">0</span> V</div>
-        <div class="controls">
-            <span>
-                <span class="controls_label">Drive:</span>
-                <progress id="drive" value="1" max="4"></progress>
-                <span id="drive_value" class="crv">0</span>
-            </span>
-            <span>
-                <span class="controls_label">Steering:</span>
-                <progress id="steering" value="50" max="100"></progress>
-                <span id="steering_value" class="crv">0</span>
-            </span>
-        </div>
-        <div>
-            <button id="connect">&#128260;</button>
-            <button id="light">&#128161;</button>
-            <button id="horn">&#128266;</button>
-            <button id="up">&#8593;</button>
-            <button id="brake">&#8595;</button>
-            <button id="left">&#8592;</button>
-            <button id="right">&#8594;</button>
-            <button id="update">&#128427;</button>
-            <button id="log">&#128462;</button>
-            <button id="stop">STOP</button>
+    <body>
+        <div class="overlay_update">UPDATING...</div>
+        <div class="overlay_connect">CONNECTING...</div>
+        <div class="overlay_download">DOWNLOADING...</div>
+        <div class="main">
+            <div class="header">
+                <div>Status: <span id="status"></span></div>
+                <div>Request: <span id="requestCount">0</span> req/s</div>
+                <div class="battery">&#128267; <span id="battery">0</span> V</div>
+            </div>
+            <div class="buttons">
+                <div class="top">
+                    <div class="left">
+                        <button id="connect">&#128225;</button>
+                    </div>
+                    <div class="center">
+                        <button id="up">&#8593;</button>
+                    </div>
+                    <div class="right">
+                        <button id="light">&#128161;</button>
+                        <button id="horn">&#128266;</button>
+                    </div>
+                </div>
+                <div class="middle">
+                    <button id="left">&#8592;</button>
+                    <button id="right">&#8594;</button>
+                </div>
+                <div class="bottom">
+                    <div class="left">
+                        <button id="update">&#128228;</button>
+                        <button id="log">&#128196;</button>
+                    </div>
+                    <div class="center">
+                        <button id="brake">&#8595;</button>
+                    </div>
+                    <div class="right">
+                        <button id="stop">STOP</button>
+                    </div>
+                </div>
+            </div>
+            <div class="footer">
+                <span>
+                    <span class="controls_label">Drive:</span>
+                    <progress id="drive" value="1" max="4"></progress>
+                    <span id="drive_value" class="crv">0</span>
+                </span>
+                <span>
+                    <span class="controls_label">Steering:</span>
+                    <progress id="steering" value="50" max="100"></progress>
+                    <span id="steering_value" class="crv">0</span>
+                </span>
+            </div>
         </div>
         <input type="file" id="autoupdate" style="display: none" />
     </body>
