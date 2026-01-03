@@ -3,6 +3,7 @@ from time import sleep_ms, ticks_ms, ticks_diff
 from math import floor
 from servo import Servo
 from machine import Pin, PWM
+import sys
 
 # ====== CONFIGURATION OF HARDWARE VALUES RANGE ======
 STEERING_SERVO_MIN, STEERING_SERVO_MAX = 0, 116
@@ -158,6 +159,7 @@ class RcCar:
             except KeyboardInterrupt:
                 raise
             except Exception as e:
-                print("WARN: servo_control_thread error:", e)
+                print("--- WARN: servo_control_thread error ---")
+                sys.print_exception(e)
+                print("-------------")
             sleep_ms(10)
-

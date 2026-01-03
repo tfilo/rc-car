@@ -30,7 +30,8 @@ body {
 #horn,
 #light,
 #update,
-#connect {
+#connect,
+#log {
     position: absolute;
     border-radius: 16px;
     font-size: xx-large;
@@ -71,6 +72,7 @@ body {
 #stop,
 #light,
 #connect,
+#log,
 #update {
     width: 12%;
     height: min(20vw, 20vh);
@@ -87,22 +89,35 @@ body {
     top: 8%;
     right: 21%;
 }
-#connect {
-    top: 8%;
-    left: 5%;
-    width: 28%;
-    background-color: orangered;
-}
 #stop {
     bottom: 5%;
     right: 5%;
     color: red;
     font-size: large;
 }
+#connect {
+    top: 8%;
+    left: 5%;
+    border-width: 2px;
+    width: auto;
+    height: auto;
+    padding: 20px;
+    line-height: 20px;
+    font-size: 20px;
+}
 #update {
     bottom: 8%;
     left: 5%;
-    background-color: lightgrey;
+    border-width: 2px;
+    width: auto;
+    height: auto;
+    padding: 20px;
+    line-height: 20px;
+    font-size: 20px;
+}
+#log {
+    bottom: 8%;
+    left: calc(5% + 70px);
     border-width: 2px;
     width: auto;
     height: auto;

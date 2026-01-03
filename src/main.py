@@ -2,10 +2,11 @@ from time import sleep_ms
 from rc_car import RcCar
 from battery import Battery
 from server import Server
-# import os
+import os
+import sys
 
-# logfile = open("log.txt", "a")
-# os.dupterm(logfile)
+logfile = open("log.txt", "w+")
+os.dupterm(logfile)
 
 # ====== ADC BATTERY =====
 
@@ -42,7 +43,9 @@ while True:
     except KeyboardInterrupt:
         raise
     except Exception as e:
-        print("WARN: wifi/server thread restart:", e)
+        print("--- WARN: wifi/server thread restart ---")
+        sys.print_exception(e)
+        print("-------------")
 
+    logfile.flush()
     sleep_ms(10)
-

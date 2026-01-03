@@ -7,6 +7,7 @@ import hashlib
 import binascii
 import machine
 import gzip
+import sys
 
 # ====== WIFI ACCESS POINT CONSTANTS ======
 AP_SSID = "RcCar"
@@ -117,6 +118,8 @@ class Server:
             response = STATIC_STYLE_RESPONSE
         elif request.startswith("GET /control.js "):
             response = STATIC_CONTROL_RESPONSE
+        elif request.startswith("GET /log.txt "):
+            response = load_file("log.txt")
         elif request.startswith("POST /update "):
             try:
                 print("OTA Update")
@@ -126,7 +129,6 @@ class Server:
                         content_length = int(line.split(":")[1].strip())
                         break
 
-                print("Expected content length:", content_length)
                 # Read the binary body (ota.tar.gz)
                 with open("ota.tar.gz", "wb") as f:
                     if body_data:
@@ -141,8 +143,6 @@ class Server:
                             break
                         f.write(chunk)
                         remaining -= len(chunk)
-                        
-                print("File received:")
 
                 # Extract the tar.gz file
                 with gzip.open("ota.tar.gz", "rb") as f:
@@ -165,7 +165,6 @@ class Server:
 
                         # Type '0' (48) or \0 (0) is a normal file
                         if file_type in (0, 48) and name:
-                            print("Extracting:", name)
                             with open(name, "wb") as out_f:
                                 remaining = size
                                 while remaining > 0:
@@ -193,7 +192,9 @@ class Server:
                 return
 
             except Exception as e:
-                print("OTA Error:", e)
+                print("--- OTA Error ---")
+                sys.print_exception(e)
+                print("-------------")
                 response = "HTTP/1.1 500 Server Error\r\n\r\nOTA Failed"
         else:
             response = STATIC_NOT_FOUND_RESPONSE
@@ -224,7 +225,9 @@ class Server:
 
             self.client_socket.send(header + payload_bytes)
         except Exception as e:
-            print("Error while sending frame:", e)
+            print("--- Error while sending frame ---")
+            sys.print_exception(e)
+            print("-------------")
             self.client_socket.close()
             self.client_socket = None
 
@@ -259,14 +262,14 @@ class Server:
             # We have an active WebSocket, reading data
             msg = self.__receive_ws_frame(self.client_socket)
             if msg:
-                print("WS received:", msg)
+                # print("WS received:", msg)
                 # Here you process JSON or the string "steering,drive,horn,light"
                 if msg == "exit":
                     print("WS closing on client request")
                     self.client_socket.close()
                     self.client_socket = None
                     return None
-                
+
                 match = search(
                     r"steering=([-0-9]+)&drive=([-0-9]+)&horn=([-0-9]+)&light=([-0-9]+)",
                     msg,
@@ -284,4 +287,3 @@ class Server:
                 self.client_socket.close()
                 self.client_socket = None
         return None
-

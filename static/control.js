@@ -25,6 +25,9 @@ let lastSuccessfullApiCall = Date.now();
 let steeringInterval = null;
 let steeringTimeout = null;
 
+/** socket */
+let keepOpen = true;
+
 function steeringResetTimeout() {
     clearTimeout(steeringTimeout);
     clearInterval(steeringInterval);
@@ -123,6 +126,11 @@ function openSocket() {
             // if socket closes, try to reconnect after a short delay
             socket = null;
             document.getElementById('connect').style.display = 'inline-block';
+            if (keepOpen) {
+                setTimeout(() => {
+                    openSocket();
+                }, 50);
+            }
         };
 
         socket.onerror = function () {
@@ -153,6 +161,50 @@ async function send() {
         document.getElementById('status').innerHTML = 'Offline';
         document.getElementById('connect').style.display = 'inline-block';
     }
+}
+
+async function update(event) {
+    const file = event.target.files[0];
+
+    if (file) {
+        if (confirm('Are you sure you want to upload the update? The car will restart after a successful update.')) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                keepOpen = false;
+                socket.send('exit');
+                socket.close();
+                socket = null;
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+            }
+            await fetch('/update', {
+                method: 'POST',
+                body: file
+            })
+                .then((response) => {
+                    if (response.ok) {
+                        alert('Update successful! The car will restart now.');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 5000);
+                    } else {
+                        alert('Update failed. Please try again.');
+                    }
+                })
+                .catch((error) => {
+                    alert('Error during update: ' + error.message);
+                });
+        }
+    }
+}
+
+async function downloadLog() {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        keepOpen = false;
+        socket.send('exit');
+        socket.close();
+        socket = null;
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+    window.open('/log.txt', '_blank');
 }
 
 /** Update UI periodically */
@@ -204,35 +256,5 @@ document.getElementById('left').addEventListener('pointercancel', steeringResetT
 document.getElementById('update').addEventListener('click', () => {
     document.getElementById('autoupdate').click();
 });
-
-document.getElementById('autoupdate').addEventListener('change', async (event) => {
-    const file = event.target.files[0];
-
-    if (file) {
-        if (confirm('Are you sure you want to upload the update? The car will restart after a successful update.')) {
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send('exit');
-                socket.close();
-                socket = null;
-                await new Promise((resolve) => setTimeout(resolve, 2000));
-            }
-            fetch('/update', {
-                method: 'POST',
-                body: file
-            })
-                .then((response) => {
-                    if (response.ok) {
-                        alert('Update successful! The car will restart now.');
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 5000);
-                    } else {
-                        alert('Update failed. Please try again.');
-                    }
-                })
-                .catch((error) => {
-                    alert('Error during update: ' + error.message);
-                });
-        }
-    }
-});
+document.getElementById('autoupdate').addEventListener('change', update);
+document.getElementById('log').addEventListener('click', downloadLog);
