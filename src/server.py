@@ -1,5 +1,5 @@
 from ure import search
-from time import sleep_ms
+from time import sleep_ms, ticks_ms, ticks_diff
 import network
 import rp2
 import socket
@@ -65,6 +65,7 @@ class Server:
         self.s.listen(1)
         print("HTTP server running")
         self.client_socket = None  #
+        self.last_action_time = ticks_ms()
 
     def __generate_ws_accept(self, key):
         # WebSocket handshake requires a magic string
@@ -97,17 +98,30 @@ class Server:
         """Very simplified reading of a WebSocket frame (text only)"""
         try:
             data = client.recv(64)
-            if not data:
+            if not data or len(data) < 6:
+                return None
+
+            # Check for Text frame (opcode 0x1)
+            opcode = data[0] & 0x0F
+            if opcode != 0x1:
                 return None
 
             # MicroPython masking implementation (the browser always masks client-to-server data)
             payload_len = data[1] & 127
+
+            # Ensure we have enough data
+            if len(data) < 6 + payload_len:
+                return None
+
             masks = data[2:6]
             payload = data[6 : 6 + payload_len]
 
             decoded = bytes([payload[i] ^ masks[i % 4] for i in range(len(payload))])
             return decoded.decode()
-        except Exception:
+        except Exception as e:
+            print("--- __receive_ws_frame Error ---")
+            sys.print_exception(e)
+            print("-------------")
             return None
 
     def __handle_http(self, client, request, body_data=b""):
@@ -119,7 +133,15 @@ class Server:
         elif request.startswith("GET /control.js "):
             response = STATIC_CONTROL_RESPONSE
         elif request.startswith("GET /log.txt "):
-            response = load_file("log.txt")
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/plain\r\n\r\n" + load_file("log.txt")
+            )
+        elif request.startswith("GET /log.old.txt "):
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/plain\r\n\r\n" + load_file("log.old.txt")
+            )
         elif request.startswith("POST /update "):
             try:
                 print("OTA Update")
@@ -225,7 +247,7 @@ class Server:
 
             self.client_socket.send(header + payload_bytes)
         except Exception as e:
-            print("--- Error while sending frame ---")
+            print("--- send_ws_frame Error ---")
             sys.print_exception(e)
             print("-------------")
             self.client_socket.close()
@@ -246,7 +268,10 @@ class Server:
             else:
                 try:
                     request = data.decode()
-                except:
+                except Exception as e:
+                    print("--- listen_for_commands, decode Error ---")
+                    sys.print_exception(e)
+                    print("-------------")
                     request = data.decode("utf-8", "ignore")
                 body_data = b""
 
@@ -262,8 +287,7 @@ class Server:
             # We have an active WebSocket, reading data
             msg = self.__receive_ws_frame(self.client_socket)
             if msg:
-                # print("WS received:", msg)
-                # Here you process JSON or the string "steering,drive,horn,light"
+                self.last_action_time = ticks_ms()
                 if msg == "exit":
                     print("WS closing on client request")
                     self.client_socket.close()
@@ -283,7 +307,11 @@ class Server:
                     )
                     return result
             else:
-                print("WS closing")
-                self.client_socket.close()
-                self.client_socket = None
+                elapsed_ms = ticks_diff(ticks_ms(), self.last_action_time)
+                # 300ms timeout is sufficient as client sends data every 50ms
+                if elapsed_ms > 300:
+                    print("WS closing due to timeout")
+                    self.client_socket.close()
+                    self.client_socket = None
+
         return None

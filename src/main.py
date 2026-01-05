@@ -5,6 +5,17 @@ from server import Server
 import os
 import sys
 
+try:
+    # Backup old log file if exists
+    logfile = open("log.txt", "r")
+    oldlog = open("log.old.txt", "w")
+    oldlog.write(logfile.read())
+    oldlog.close()
+    logfile.close()
+except Exception as e:
+    pass
+
+# Redirect stdout and stderr to log file
 logfile = open("log.txt", "w+")
 os.dupterm(logfile)
 
@@ -25,20 +36,27 @@ rc_car = RcCar(
 server = Server()
 
 counter = 0
-voltage = battery.read_voltage()
+voltage_history = [0] * 10
+for i in range(10):
+    sleep_ms(10)
+    voltage_history[i] = battery.read_voltage()
 
 while True:
     try:
         counter += 1
 
-        if counter > 1000:
+        if counter > 100:
             counter = 0
-            voltage = battery.read_voltage()
+            # Update voltage history
+            voltage_history.pop(0)
+            voltage_history.append(battery.read_voltage())
+            # Calculate average
+            voltage = sum(voltage_history) / len(voltage_history)
+            server.send_ws_frame(str(voltage))
 
         request = server.listen_for_commands()
         if request is not None:
             rc_car.update(request[0], request[1], request[2], request[3])
-        server.send_ws_frame(str(voltage))
 
     except KeyboardInterrupt:
         raise
