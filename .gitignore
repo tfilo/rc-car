@@ -2,3 +2,5 @@ node_modules
 index.min.html
 build/**/*.*
 ota.tar.gz
+log.txt
+log.old.txt

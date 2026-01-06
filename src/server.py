@@ -76,13 +76,13 @@ class Server:
     def __handle_handshake(self, client, request):
         # Search Sec-WebSocket-Key
         lines = request.split("\r\n")
-        key = ""
+        key = None
         for line in lines:
             if "Sec-WebSocket-Key:" in line:
                 key = line.split(":")[1].strip()
                 break
 
-        if key:
+        if key is not None:
             accept_key = self.__generate_ws_accept(key)
             response = (
                 "HTTP/1.1 101 Switching Protocols\r\n"
@@ -151,6 +151,11 @@ class Server:
                         content_length = int(line.split(":")[1].strip())
                         break
 
+                # Check for GZIP magic bytes (1f 8b) to prevent invalid file upload
+                if len(body_data) >= 2:
+                    if body_data[:2] != b"\x1f\x8b":
+                        raise ValueError("Invalid file signature. Expected .tar.gz")
+
                 # Read the binary body (ota.tar.gz)
                 with open("ota.tar.gz", "wb") as f:
                     if body_data:
@@ -167,6 +172,7 @@ class Server:
                         remaining -= len(chunk)
 
                 # Extract the tar.gz file
+                files_extracted = 0
                 with gzip.open("ota.tar.gz", "rb") as f:
                     while True:
                         header = f.read(512)
@@ -195,6 +201,7 @@ class Server:
                                         break
                                     out_f.write(chunk)
                                     remaining -= len(chunk)
+                                files_extracted += 1
                         else:
                             # Skip data for directories or other types
                             remaining = size
@@ -207,6 +214,9 @@ class Server:
                         if padding:
                             f.read(padding)
 
+                if files_extracted == 0:
+                    raise ValueError("Archive was empty or contained no valid files")
+
                 client.send("HTTP/1.1 200 OK\r\n\r\nOTA Success. Rebooting...")
                 client.close()
                 sleep_ms(1000)
@@ -217,7 +227,7 @@ class Server:
                 print("--- OTA Error ---")
                 sys.print_exception(e)
                 print("-------------")
-                response = "HTTP/1.1 500 Server Error\r\n\r\nOTA Failed"
+                response = "HTTP/1.1 500 Server Error\r\n\r\nOTA Failed: " + str(e)
         else:
             response = STATIC_NOT_FOUND_RESPONSE
 
@@ -257,7 +267,7 @@ class Server:
         """Main loop that handles either a new HTTP request or an existing WS"""
         if self.client_socket is None:
             # Waiting for a new connection
-            client, addr = self.s.accept()
+            client, _ = self.s.accept()
             data = client.recv(1024)
 
             # Separate headers from body to avoid UnicodeError
