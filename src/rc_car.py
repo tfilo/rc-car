@@ -10,7 +10,8 @@ STEERING_SERVO_MIN, STEERING_SERVO_MAX = 0, 116
 STEERING_SERVO_MID = floor(STEERING_SERVO_MAX / 2)
 
 MOTOR_MAX_DUTY_CYCLE = 65535
-MOTOR_MIN_DUTY_CYCLE = 48000
+MOTOR_MAX_DUTY_CYCLE_REVERSE = 52000
+MOTOR_MIN_DUTY_CYCLE = 42000
 MOTOR_ZERO_DUTY_CYCLE = 0
 MOTOR_FREQ_HZ = 20000
 
@@ -18,12 +19,14 @@ LED_OFF = 0
 LED_ON = 1
 
 HORN_FREQUENCY_HZ = 400
-HORN_DUTY_CYCLE = 20000
+HORN_DUTY_CYCLE = 5000
 HORN_DUTY_CYCLE_OFF = 0
 
 # ====== CONFIGURATION OF CONTROL VALUES RANGE ======
 DRIVE_MIN_SPEED = 1
-DRIVE_MAX_SPEED = 3
+DRIVE_MAX_SPEED = 4
+DRIVE_MIN_SPEED_REVERSE = -1
+DRIVE_MAX_SPEED_REVERSE = -2
 STEERING_MIN = 0
 STEERING_MAX = 100
 
@@ -87,7 +90,7 @@ class RcCar:
         self.servo.write(steering)
 
     def __forward(self, speed):
-        # speed can be 1, 2, or 3
+        # speed can be 1, 2, 3, or 4
         duty_cycle = map_range(
             speed,
             DRIVE_MIN_SPEED,
@@ -98,9 +101,16 @@ class RcCar:
         self.motor1a.duty_u16(duty_cycle)
         self.motor1b.duty_u16(MOTOR_ZERO_DUTY_CYCLE)
 
-    def __backward(self):
+    def __backward(self, speed):
+        duty_cycle = map_range(
+            abs(speed),
+            abs(DRIVE_MIN_SPEED_REVERSE),
+            abs(DRIVE_MAX_SPEED_REVERSE),
+            MOTOR_MIN_DUTY_CYCLE,
+            MOTOR_MAX_DUTY_CYCLE_REVERSE,
+        )
         self.motor1a.duty_u16(MOTOR_ZERO_DUTY_CYCLE)
-        self.motor1b.duty_u16(MOTOR_MIN_DUTY_CYCLE)
+        self.motor1b.duty_u16(duty_cycle)
 
     def __stop(self):
         self.motor1a.duty_u16(MOTOR_ZERO_DUTY_CYCLE)
@@ -138,12 +148,13 @@ class RcCar:
 
                 self.__steer(self.steering)
 
-                if self.drive == -1:
-                    self.__backward()
+                if self.drive < 0:
+                    self.__backward(self.drive)
                 elif self.drive == 0:
                     self.__stop()
                 else:
                     self.__forward(self.drive)
+
                 if self.horn == True and horn_prev == False:
                     horn_prev = True
                     self.__horn_on()

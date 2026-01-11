@@ -6,9 +6,11 @@ const LIGHT_ON = 1;
 const WAIT_MS = 50;
 const S_MIN = 0;
 const S_MAX = 100;
-const REVERSE = -1;
-const FORWARD_MAX = 3;
+const REVERSE_MAX = -2;
+const FORWARD_MAX = 4;
 const STOP = 0;
+const BAT_MIN_V = 3.8;
+const BAT_MAX_V = 4.8;
 
 /** Global variables */
 let steering = S_MAX / 2;
@@ -90,21 +92,13 @@ function pressedBrake() {
 
 function forward() {
     if (isSocketOpen()) {
-        if (drive === REVERSE) {
-            drive = STOP;
-        } else {
-            drive = Math.min(drive + 1, FORWARD_MAX);
-        }
+        drive = Math.min(drive + 1, FORWARD_MAX);
     }
 }
 
 function reverse() {
     if (isSocketOpen()) {
-        if (drive > STOP) {
-            drive = Math.max(drive - 1, STOP);
-        } else {
-            drive = REVERSE;
-        }
+        drive = Math.max(drive - 1, REVERSE_MAX);
     }
 }
 
@@ -172,10 +166,8 @@ async function openSocket() {
                 if (rawBattery && !isNaN(+rawBattery)) {
                     const batteryVoltage = (+rawBattery).toFixed(2);
 
-                    // convert range 4.2 to 4.8V to 0-100%
-                    const minVoltage = 4.2;
-                    const maxVoltage = 4.8;
-                    let batteryPercentage = ((batteryVoltage - minVoltage) / (maxVoltage - minVoltage)) * 100;
+                    // convert range BAT_MIN_V to BAT_MAX_V to 0-100%
+                    let batteryPercentage = ((batteryVoltage - BAT_MIN_V) / (BAT_MAX_V - BAT_MIN_V)) * 100;
                     batteryPercentage = Math.max(0, Math.min(100, batteryPercentage));
 
                     document.getElementById('battery').innerHTML = batteryPercentage.toFixed(0);
@@ -282,14 +274,14 @@ setInterval(() => {
         document.getElementById('requestCount').innerHTML = requestCount;
         requestCount = 0;
     }
-    document.getElementById('drive').value = drive + 1;
+    document.getElementById('drive').value = drive + 2;
     document.getElementById('steering').value = steering;
     document.getElementById('drive_value').innerHTML = drive;
     document.getElementById('steering_value').innerHTML = steering - S_MAX / 2;
     document.getElementById('horn').style.backgroundColor = horn === HORN_ON ? 'orange' : 'lightgray';
     document.getElementById('light').style.backgroundColor = light === LIGHT_ON ? 'orange' : 'lightgray';
-    document.getElementById('up').style.backgroundColor = drive > 0 ? `hsl(120, 73%, ${80 - drive * 10}%)` : 'lightgray';
-    document.getElementById('brake').style.backgroundColor = drive === REVERSE ? 'lightblue' : 'lightgray';
+    document.getElementById('up').style.backgroundColor = drive > STOP ? `hsl(120, 73%, ${80 - drive * 10}%)` : 'lightgray';
+    document.getElementById('brake').style.backgroundColor = drive < STOP ? `hsl(195, 53%, ${80 - Math.abs(drive) * 10}%)` : 'lightgray';
     document.getElementById('left').style.backgroundColor =
         steering < S_MAX / 2 ? `hsl(0, 0%, ${70 - Math.abs(steering - S_MAX / 2) / 2}%)` : 'lightgray';
     document.getElementById('right').style.backgroundColor =
@@ -335,5 +327,29 @@ document.getElementById('autoupdate').addEventListener('change', update);
 document.getElementById('log').addEventListener('click', downloadLog);
 
 window.onload = () => {
+    keepOpen = true;
     openSocket();
+};
+
+window.onpageshow = () => {
+    keepOpen = true;
+    openSocket();
+};
+
+window.onbeforeunload = () => {
+    keepOpen = false;
+    if (isSocketOpen()) {
+        socket.send('exit');
+        socket.close();
+        socket = null;
+    }
+};
+
+window.onpagehide = () => {
+    keepOpen = false;
+    if (isSocketOpen()) {
+        socket.send('exit');
+        socket.close();
+        socket = null;
+    }
 };
