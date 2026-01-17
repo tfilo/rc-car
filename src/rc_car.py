@@ -9,11 +9,17 @@ import sys
 STEERING_SERVO_MIN, STEERING_SERVO_MAX = 0, 116
 STEERING_SERVO_MID = floor(STEERING_SERVO_MAX / 2)
 
-MOTOR_MAX_DUTY_CYCLE = 65535
-MOTOR_MAX_DUTY_CYCLE_REVERSE = 52000
-MOTOR_MIN_DUTY_CYCLE = 42000
-MOTOR_ZERO_DUTY_CYCLE = 0
 MOTOR_FREQ_HZ = 20000
+MOTOR_DRIVE_TO_DUTY_CYCLE_MAP = {
+    -2: 48000,
+    -1: 42000,
+    0: 0,
+    1: 42000,
+    2: 46000,
+    3: 54000,
+    4: 65535,
+}
+MOTOR_ZERO_DUTY_CYCLE = MOTOR_DRIVE_TO_DUTY_CYCLE_MAP[0]
 
 LED_OFF = 0
 LED_ON = 1
@@ -23,10 +29,6 @@ HORN_DUTY_CYCLE = 5000
 HORN_DUTY_CYCLE_OFF = 0
 
 # ====== CONFIGURATION OF CONTROL VALUES RANGE ======
-DRIVE_MIN_SPEED = 1
-DRIVE_MAX_SPEED = 4
-DRIVE_MIN_SPEED_REVERSE = -1
-DRIVE_MAX_SPEED_REVERSE = -2
 STEERING_MIN = 0
 STEERING_MAX = 100
 
@@ -91,24 +93,12 @@ class RcCar:
 
     def __forward(self, speed):
         # speed can be 1, 2, 3, or 4
-        duty_cycle = map_range(
-            speed,
-            DRIVE_MIN_SPEED,
-            DRIVE_MAX_SPEED,
-            MOTOR_MIN_DUTY_CYCLE,
-            MOTOR_MAX_DUTY_CYCLE,
-        )
+        duty_cycle = MOTOR_DRIVE_TO_DUTY_CYCLE_MAP.get(speed, MOTOR_DRIVE_TO_DUTY_CYCLE_MAP[0])
         self.motor1a.duty_u16(duty_cycle)
         self.motor1b.duty_u16(MOTOR_ZERO_DUTY_CYCLE)
 
     def __backward(self, speed):
-        duty_cycle = map_range(
-            abs(speed),
-            abs(DRIVE_MIN_SPEED_REVERSE),
-            abs(DRIVE_MAX_SPEED_REVERSE),
-            MOTOR_MIN_DUTY_CYCLE,
-            MOTOR_MAX_DUTY_CYCLE_REVERSE,
-        )
+        duty_cycle = MOTOR_DRIVE_TO_DUTY_CYCLE_MAP.get(speed, MOTOR_DRIVE_TO_DUTY_CYCLE_MAP[0])
         self.motor1a.duty_u16(MOTOR_ZERO_DUTY_CYCLE)
         self.motor1b.duty_u16(duty_cycle)
 
