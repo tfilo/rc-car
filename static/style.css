@@ -124,3 +124,22 @@ button:active {
     flex: 1;
     gap: 4%;
 }
+
+.buttons > .top > .left > button,
+.buttons > .bottom > .left > button {
+    width: 64px;
+    height: 64px;
+    flex: initial;
+}
+
+.buttons > .top > .left > button {
+    align-self: normal;
+}
+
+.buttons > .bottom > .left > button {
+    align-self: end;
+}
+
+#disconnect {
+    display: none;
+}

@@ -1,4 +1,4 @@
-from time import sleep_ms
+from time import sleep_ms, ticks_ms, ticks_diff
 from rc_car import RcCar
 from battery import Battery
 from server import Server
@@ -41,8 +41,18 @@ for i in range(10):
     sleep_ms(10)
     voltage_history[i] = battery.read_voltage()
 
+sleep_timeout_ms = 50
+
 while True:
     try:
+        req_start = ticks_ms()
+        # Calculate average
+        voltage = sum(voltage_history) / len(voltage_history)
+        request = server.listen_for_commands()
+        if request is not None:
+            rc_car.update(request[0], request[1], request[2], request[3])
+            server.send_ws_frame(str(voltage))
+
         counter += 1
 
         if counter > 100:
@@ -50,13 +60,11 @@ while True:
             # Update voltage history
             voltage_history.pop(0)
             voltage_history.append(battery.read_voltage())
-            # Calculate average
-            voltage = sum(voltage_history) / len(voltage_history)
-            server.send_ws_frame(str(voltage))
 
-        request = server.listen_for_commands()
-        if request is not None:
-            rc_car.update(request[0], request[1], request[2], request[3])
+        req_duration = ticks_diff(ticks_ms(), req_start)
+        final_sleep_timeout_ms = sleep_timeout_ms - req_duration
+        if final_sleep_timeout_ms > 0:
+            sleep_ms(final_sleep_timeout_ms)
 
     except KeyboardInterrupt:
         raise
@@ -66,4 +74,3 @@ while True:
         print("-------------")
 
     logfile.flush()
-    sleep_ms(10)

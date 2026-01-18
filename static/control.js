@@ -3,7 +3,7 @@ const HORN_OFF = 0;
 const HORN_ON = 1;
 const LIGHT_OFF = 0;
 const LIGHT_ON = 1;
-const WAIT_MS = 50;
+const WAIT_MS = 20;
 const S_MIN = 0;
 const S_MAX = 100;
 const REVERSE_MAX = -2;
@@ -18,7 +18,6 @@ let drive = STOP;
 let horn = HORN_OFF;
 let light = LIGHT_OFF;
 let requestCount = 0;
-let totalElapsedTime = 0;
 let horntimeout = null;
 
 /** Control functions */
@@ -28,9 +27,7 @@ let driveInterval = null;
 let driveTimeout = null;
 
 /** socket */
-let keepOpen = true;
 let socket = null;
-let socketSendInterval = null;
 
 function isSocketOpen() {
     return socket && socket.readyState === WebSocket.OPEN;
@@ -146,56 +143,53 @@ function reset() {
 }
 
 async function openSocket() {
-    return new Promise((resolve) => {
-        if (!socket || (socket.readyState !== WebSocket.OPEN && socket.readyState !== WebSocket.CONNECTING)) {
-            document.querySelector('.overlay_connect').style.display = 'flex';
-            socket = new WebSocket('ws://' + window.location.hostname + '/ws');
+    if (!socket || (socket.readyState !== WebSocket.OPEN && socket.readyState !== WebSocket.CONNECTING)) {
+        document.querySelector('.overlay_connect').style.display = 'flex';
+        socket = new WebSocket('ws://' + window.location.hostname + '/ws');
 
-            socket.onopen = function () {
-                console.log('WebSocket connection opened');
-                document.querySelector('.overlay_connect').style.display = 'none';
-                clearInterval(socketSendInterval);
-                socketSendInterval = setInterval(() => {
-                    send();
-                }, WAIT_MS);
-                resolve();
-            };
-
-            socket.onmessage = function (event) {
-                const rawBattery = event.data;
-                if (rawBattery && !isNaN(+rawBattery)) {
-                    const batteryVoltage = (+rawBattery).toFixed(2);
-
-                    // convert range BAT_MIN_V to BAT_MAX_V to 0-100%
-                    let batteryPercentage = ((batteryVoltage - BAT_MIN_V) / (BAT_MAX_V - BAT_MIN_V)) * 100;
-                    batteryPercentage = Math.max(0, Math.min(100, batteryPercentage));
-
-                    document.getElementById('battery').innerHTML = batteryPercentage.toFixed(0);
-                }
-            };
-
-            socket.onclose = function () {
-                console.log('WebSocket connection closed');
-                reset();
-                // if socket closes, try to reconnect after a short delay
-                clearInterval(socketSendInterval);
-                socket = null;
-                if (keepOpen) {
-                    document.querySelector('.overlay_connect').style.display = 'flex';
-                    setTimeout(async () => {
-                        await openSocket();
-                    }, WAIT_MS);
-                }
-            };
-
-            socket.onerror = function (error) {
-                console.log('WebSocket connection error', error);
-            };
-        } else {
+        socket.onopen = function () {
+            console.log('WebSocket connection opened');
             document.querySelector('.overlay_connect').style.display = 'none';
-            resolve();
-        }
-    });
+            send();
+        };
+
+        socket.onmessage = function (event) {
+            const rawBattery = event.data;
+            if (rawBattery && !isNaN(+rawBattery)) {
+                const batteryVoltage = (+rawBattery).toFixed(2);
+
+                // convert range BAT_MIN_V to BAT_MAX_V to 0-100%
+                let batteryPercentage = ((batteryVoltage - BAT_MIN_V) / (BAT_MAX_V - BAT_MIN_V)) * 100;
+                batteryPercentage = Math.max(0, Math.min(100, batteryPercentage));
+
+                document.getElementById('battery').innerHTML = batteryPercentage.toFixed(0);
+                send();
+            }
+        };
+
+        socket.onclose = function () {
+            console.log('WebSocket connection closed');
+            reset();
+            socket = null;
+        };
+
+        socket.onerror = function (error) {
+            console.log('WebSocket connection error', error);
+        };
+    } else {
+        document.querySelector('.overlay_connect').style.display = 'none';
+    }
+}
+
+function closeSocket() {
+    reset();
+    if (isSocketOpen()) {
+        socket.send('exit');
+        socket.close();
+        socket = null;
+    } else {
+        socket = null;
+    }
 }
 
 /** Send control data to server */
@@ -220,13 +214,8 @@ async function update(event) {
         if (file) {
             if (confirm('Are you sure you want to upload the update? The car will restart after a successful update.')) {
                 document.querySelector('.overlay_update').style.display = 'flex';
-                if (isSocketOpen()) {
-                    keepOpen = false;
-                    socket.send('exit');
-                    socket.close();
-                    socket = null;
-                    await new Promise((resolve) => setTimeout(resolve, 2000));
-                }
+                closeSocket();
+                await new Promise((resolve) => setTimeout(resolve, 2000));
                 const response = await fetch('/update', {
                     method: 'POST',
                     body: file
@@ -243,7 +232,6 @@ async function update(event) {
             }
         }
     } catch (error) {
-        keepOpen = true;
         alert('Error during update: ' + error.message);
     }
 }
@@ -252,16 +240,12 @@ async function downloadLog() {
     try {
         if (isSocketOpen()) {
             document.querySelector('.overlay_download').style.display = 'flex';
-            keepOpen = false;
-            socket.send('exit');
-            socket.close();
-            socket = null;
+            closeSocket();
             await new Promise((resolve) => setTimeout(resolve, 2000));
         }
         window.open('/log.txt', '_blank');
         window.open('/log.old.txt', '_blank');
     } finally {
-        keepOpen = true;
         document.querySelector('.overlay_download').style.display = 'none';
     }
 }
@@ -287,10 +271,12 @@ setInterval(() => {
     document.getElementById('right').style.backgroundColor =
         steering > S_MAX / 2 ? `hsl(0, 0%, ${70 - Math.abs(steering - S_MAX / 2) / 2}%)` : 'lightgray';
     document.getElementById('connect').style.display = isSocketOpen() ? 'none' : 'inline-block';
+    document.getElementById('disconnect').style.display = isSocketOpen() ? 'inline-block' : 'none';
 }, 100);
 
 /** Keyboard controls */
 document.getElementById('connect').addEventListener('click', openSocket);
+document.getElementById('disconnect').addEventListener('click', closeSocket);
 document.getElementById('light').addEventListener('click', lightToggle);
 document.getElementById('horn').addEventListener('click', honk);
 document.getElementById('up').addEventListener('click', forward);
@@ -327,29 +313,13 @@ document.getElementById('autoupdate').addEventListener('change', update);
 document.getElementById('log').addEventListener('click', downloadLog);
 
 window.onload = () => {
-    keepOpen = true;
-    openSocket();
-};
-
-window.onpageshow = () => {
-    keepOpen = true;
     openSocket();
 };
 
 window.onbeforeunload = () => {
-    keepOpen = false;
-    if (isSocketOpen()) {
-        socket.send('exit');
-        socket.close();
-        socket = null;
-    }
+    closeSocket();
 };
 
 window.onpagehide = () => {
-    keepOpen = false;
-    if (isSocketOpen()) {
-        socket.send('exit');
-        socket.close();
-        socket = null;
-    }
+    closeSocket();
 };
