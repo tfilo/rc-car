@@ -3,7 +3,7 @@ const HORN_OFF = 0;
 const HORN_ON = 1;
 const LIGHT_OFF = 0;
 const LIGHT_ON = 1;
-const WAIT_MS = 20;
+const WAIT_MS = 100;
 const S_MIN = 0;
 const S_MAX = 100;
 const REVERSE_MAX = -2;
@@ -29,7 +29,6 @@ let driveTimeout = null;
 /** socket */
 let socket = null;
 let sendInterval = null;
-let lastResponseTime = null;
 
 function isSocketOpen() {
     return socket && socket.readyState === WebSocket.OPEN;
@@ -150,7 +149,6 @@ function reset() {
 
 async function openSocket() {
     if (!socket || (socket.readyState !== WebSocket.OPEN && socket.readyState !== WebSocket.CONNECTING)) {
-        lastResponseTime = Date.now() + 2000; // prevent immediate timeout
         document.querySelector('.overlay_connect').style.display = 'flex';
         socket = new WebSocket('ws://192.168.4.1/ws');
 
@@ -159,20 +157,31 @@ async function openSocket() {
             document.querySelector('.overlay_connect').style.display = 'none';
             sendInterval = setInterval(() => {
                 send();
-            }, 50);
+            }, WAIT_MS);
         };
 
         socket.onmessage = function (event) {
-            lastResponseTime = Date.now();
-            const rawBattery = event.data;
-            if (rawBattery && !isNaN(+rawBattery)) {
-                const batteryVoltage = (+rawBattery).toFixed(2);
+            const rawData = event.data;
+            if (rawData.includes(';')) {
+                const [rawBattery, rawMemUsed] = rawData.split(';');
+                if (rawBattery && !isNaN(+rawBattery)) {
+                    const batteryVoltage = (+rawBattery).toFixed(2);
 
-                // convert range BAT_MIN_V to BAT_MAX_V to 0-100%
-                let batteryPercentage = ((batteryVoltage - BAT_MIN_V) / (BAT_MAX_V - BAT_MIN_V)) * 100;
-                batteryPercentage = Math.max(0, Math.min(100, batteryPercentage));
+                    // convert range BAT_MIN_V to BAT_MAX_V to 0-100%
+                    let batteryPercentage = ((batteryVoltage - BAT_MIN_V) / (BAT_MAX_V - BAT_MIN_V)) * 100;
+                    batteryPercentage = Math.max(0, Math.min(100, batteryPercentage));
 
-                document.getElementById('battery').innerHTML = batteryPercentage.toFixed(0);
+                    document.getElementById('battery').innerHTML = batteryPercentage.toFixed(0);
+                }
+
+                if (rawMemUsed && !isNaN(+rawMemUsed)) {
+                    const memUsed = +rawMemUsed;
+                    const memTotal = 532480; // total memory in bytes
+                    let memPercentage = (memUsed / memTotal) * 100;
+                    memPercentage = Math.max(0, Math.min(100, memPercentage));
+
+                    document.getElementById('memory').innerHTML = memPercentage.toFixed(0);
+                }
             }
         };
 
@@ -193,6 +202,7 @@ async function openSocket() {
 function closeSocket() {
     reset();
     if (isSocketOpen()) {
+        socket.send('exit');
         socket.close();
         socket = null;
     } else {
@@ -261,10 +271,6 @@ async function downloadLog() {
 /** Update UI periodically */
 let i = 0;
 setInterval(() => {
-    if (isSocketOpen() && Date.now() - lastResponseTime > 1000) {
-        document.getElementById('status').innerHTML = 'Timeout';
-        closeSocket();
-    }
     if (++i % 10 === 0) {
         // udpate request count once every second
         document.getElementById('requestCount').innerHTML = requestCount;

@@ -94,12 +94,16 @@ class RcCar:
 
     def __forward(self, speed):
         # speed can be 1, 2, 3, or 4
-        duty_cycle = MOTOR_DRIVE_TO_DUTY_CYCLE_MAP.get(speed, MOTOR_DRIVE_TO_DUTY_CYCLE_MAP[0])
+        duty_cycle = MOTOR_DRIVE_TO_DUTY_CYCLE_MAP.get(
+            speed, MOTOR_DRIVE_TO_DUTY_CYCLE_MAP[0]
+        )
         self.motor1a.duty_u16(duty_cycle)
         self.motor1b.duty_u16(MOTOR_ZERO_DUTY_CYCLE)
 
     def __backward(self, speed):
-        duty_cycle = MOTOR_DRIVE_TO_DUTY_CYCLE_MAP.get(speed, MOTOR_DRIVE_TO_DUTY_CYCLE_MAP[0])
+        duty_cycle = MOTOR_DRIVE_TO_DUTY_CYCLE_MAP.get(
+            speed, MOTOR_DRIVE_TO_DUTY_CYCLE_MAP[0]
+        )
         self.motor1a.duty_u16(MOTOR_ZERO_DUTY_CYCLE)
         self.motor1b.duty_u16(duty_cycle)
 
@@ -125,9 +129,7 @@ class RcCar:
 
     def __reset(self):
         self.drive = INIT_DRIVE
-        self.steering = INIT_STEERING
         self.horn = INIT_HORN
-        self.light = INIT_LIGHT
 
     def __servo_control_thread(self):
         horn_prev = False
@@ -135,7 +137,7 @@ class RcCar:
             try:
                 elapsed_ms = ticks_diff(ticks_ms(), self.last_action_time)
                 if elapsed_ms > EMERGENCY_STOP_TIMEOUT_MS:
-                    self.__stop()
+                    self.__reset()
 
                 self.__steer(self.steering)
 

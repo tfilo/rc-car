@@ -116,6 +116,7 @@ async def log(request):
 async def ota_update(request):
     # Save raw request body as ota.tar.gz
     try:
+        gc.collect()
         with open("ota.tar.gz", "wb") as f:
             while True:
                 chunk = await request.stream.read(1024)
@@ -124,7 +125,7 @@ async def ota_update(request):
                 f.write(chunk)
             f.flush()
             f.close()
-
+        gc.collect()
         import gzip
 
         # Extract the tar.gz file
@@ -196,9 +197,13 @@ async def ota_update(request):
 @with_websocket
 async def web_socket(request, ws):
     try:
+        counter = 0
         while True:
             message = await ws.receive()
+            gc.collect()
             if message is not None:
+                if message == "exit":
+                    break
                 match = message.split(";")
                 if match is not None:
                     result = (
@@ -209,11 +214,21 @@ async def web_socket(request, ws):
                     )
                     rc_car.update(result[0], result[1], result[2], result[3])
 
-                voltage_history.pop(0)
-                voltage_history.append(battery.read_voltage())
-                voltage = sum(voltage_history) / len(voltage_history)
+                counter += 1
+                if counter >= 10:
+                    counter = 0
+                    # Send battery voltage every 10th message
+                    voltage_history.pop(0)
+                    voltage_history.append(battery.read_voltage())
+                    voltage = sum(voltage_history) / len(voltage_history)
 
-                await ws.send(str(voltage))
+                    mem_used = 532480 - gc.mem_free()
+
+                    await ws.send(str(voltage) + ";" + str(mem_used))
+                else:
+                    sleep_ms(10)
+            else:
+                break
     except asyncio.CancelledError:
         print("Client disconnected!")
 

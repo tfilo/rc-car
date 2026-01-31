@@ -9,8 +9,8 @@
     "type": "commonjs",
     "main": "index.html",
     "scripts": {
-        "serve": "serve ./static",
-        "build": "mkdir -p build/static && minify static/index.html > build/static/index.html && minify static/style.css > build/static/style.css && minify static/control.js > build/static/control.js && cp src/*.py build/",
+        "serve": "serve ./src/static",
+        "build": "mkdir -p build/static && minify src/static/index.html > build/static/index.html && minify src/static/style.css > build/static/style.css && minify src/static/control.js > build/static/control.js && cp src/*.py build/",
         "build:ota": "npm run build && cd build && tar -czf ../ota.tar.gz *.py static/*.html static/*.js static/*.css && cd .."
     },
     "devDependencies": {
