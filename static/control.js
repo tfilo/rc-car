@@ -28,6 +28,8 @@ let driveTimeout = null;
 
 /** socket */
 let socket = null;
+let sendInterval = null;
+let lastResponseTime = null;
 
 function isSocketOpen() {
     return socket && socket.readyState === WebSocket.OPEN;
@@ -134,6 +136,10 @@ function lightToggle() {
 }
 
 function reset() {
+    if (sendInterval !== null) {
+        clearInterval(sendInterval);
+        sendInterval = null;
+    }
     steeringResetTimeout();
     driveResetTimeout();
     steering = S_MAX / 2;
@@ -144,16 +150,20 @@ function reset() {
 
 async function openSocket() {
     if (!socket || (socket.readyState !== WebSocket.OPEN && socket.readyState !== WebSocket.CONNECTING)) {
+        lastResponseTime = Date.now() + 2000; // prevent immediate timeout
         document.querySelector('.overlay_connect').style.display = 'flex';
-        socket = new WebSocket('ws://' + window.location.hostname + '/ws');
+        socket = new WebSocket('ws://192.168.4.1/ws');
 
         socket.onopen = function () {
             console.log('WebSocket connection opened');
             document.querySelector('.overlay_connect').style.display = 'none';
-            send();
+            sendInterval = setInterval(() => {
+                send();
+            }, 50);
         };
 
         socket.onmessage = function (event) {
+            lastResponseTime = Date.now();
             const rawBattery = event.data;
             if (rawBattery && !isNaN(+rawBattery)) {
                 const batteryVoltage = (+rawBattery).toFixed(2);
@@ -163,7 +173,6 @@ async function openSocket() {
                 batteryPercentage = Math.max(0, Math.min(100, batteryPercentage));
 
                 document.getElementById('battery').innerHTML = batteryPercentage.toFixed(0);
-                send();
             }
         };
 
@@ -184,7 +193,6 @@ async function openSocket() {
 function closeSocket() {
     reset();
     if (isSocketOpen()) {
-        socket.send('exit');
         socket.close();
         socket = null;
     } else {
@@ -196,7 +204,7 @@ function closeSocket() {
 async function send() {
     if (isSocketOpen()) {
         try {
-            socket.send(`steering=${steering}&drive=${drive}&horn=${horn}&light=${light}`);
+            socket.send(`${steering};${drive};${horn};${light}`);
             document.getElementById('status').innerHTML = 'OK';
             requestCount++;
         } catch (error) {
@@ -216,7 +224,7 @@ async function update(event) {
                 document.querySelector('.overlay_update').style.display = 'flex';
                 closeSocket();
                 await new Promise((resolve) => setTimeout(resolve, 2000));
-                const response = await fetch('/update', {
+                const response = await fetch('http://192.168.4.1/update', {
                     method: 'POST',
                     body: file
                 });
@@ -241,10 +249,10 @@ async function downloadLog() {
         if (isSocketOpen()) {
             document.querySelector('.overlay_download').style.display = 'flex';
             closeSocket();
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            await new Promise((resolve) => setTimeout(resolve, 1000));
         }
-        window.open('/log.txt', '_blank');
-        window.open('/log.old.txt', '_blank');
+        window.open('http://192.168.4.1/log.txt', '_blank');
+        window.open('http://192.168.4.1/log.old.txt', '_blank');
     } finally {
         document.querySelector('.overlay_download').style.display = 'none';
     }
@@ -253,6 +261,10 @@ async function downloadLog() {
 /** Update UI periodically */
 let i = 0;
 setInterval(() => {
+    if (isSocketOpen() && Date.now() - lastResponseTime > 1000) {
+        document.getElementById('status').innerHTML = 'Timeout';
+        closeSocket();
+    }
     if (++i % 10 === 0) {
         // udpate request count once every second
         document.getElementById('requestCount').innerHTML = requestCount;
@@ -307,9 +319,9 @@ document.getElementById('right').addEventListener('pointercancel', steeringReset
 document.getElementById('left').addEventListener('pointercancel', steeringResetTimeout);
 
 document.getElementById('update').addEventListener('click', () => {
-    document.getElementById('autoupdate').click();
+    document.getElementById('update_file').click();
 });
-document.getElementById('autoupdate').addEventListener('change', update);
+document.getElementById('update_file').addEventListener('change', update);
 document.getElementById('log').addEventListener('click', downloadLog);
 
 window.onload = () => {

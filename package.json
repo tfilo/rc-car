@@ -10,9 +10,8 @@
     "main": "index.html",
     "scripts": {
         "serve": "serve ./static",
-        "serve:prod": "serve ./build",
-        "build": "mkdir -p build && minify static/index.html > build/index.html && minify static/style.css > build/style.css && minify static/control.js > build/control.js && cp src/*.py build/",
-        "build:ota": "npm run build && cd build && tar -czf ../ota.tar.gz *.py *.html *.js *.css && cd .."
+        "build": "mkdir -p build/static && minify static/index.html > build/static/index.html && minify static/style.css > build/static/style.css && minify static/control.js > build/static/control.js && cp src/*.py build/",
+        "build:ota": "npm run build && cd build && tar -czf ../ota.tar.gz *.py static/*.html static/*.js static/*.css && cd .."
     },
     "devDependencies": {
         "minify": "^14.1.0",

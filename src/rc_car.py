@@ -5,10 +5,7 @@ from servo import Servo
 from machine import Pin, PWM
 import sys
 
-# ====== CONFIGURATION OF HARDWARE VALUES RANGE ======
-STEERING_SERVO_MIN, STEERING_SERVO_MAX = 0, 116
-STEERING_SERVO_MID = floor(STEERING_SERVO_MAX / 2)
-
+# ====== DRIVE VARIABLES ======
 MOTOR_FREQ_HZ = 20000
 MOTOR_DRIVE_TO_DUTY_CYCLE_MAP = {
     -2: 48000,
@@ -21,20 +18,24 @@ MOTOR_DRIVE_TO_DUTY_CYCLE_MAP = {
 }
 MOTOR_ZERO_DUTY_CYCLE = MOTOR_DRIVE_TO_DUTY_CYCLE_MAP[0]
 
+# ====== LED VARIABLES ======
 LED_OFF = 0
 LED_ON = 1
 
+# ====== HORN VARIABLES ======
 HORN_FREQUENCY_HZ = 400
 HORN_DUTY_CYCLE = 5000
 HORN_DUTY_CYCLE_OFF = 0
 
-# ====== CONFIGURATION OF CONTROL VALUES RANGE ======
+# ====== CONFIGURATION OF SERVO HARDWARE VALUES RANGE ======
+STEERING_SERVO_MIN, STEERING_SERVO_MAX = 0, 116
+STEERING_SERVO_MID = floor(STEERING_SERVO_MAX / 2)
+# ====== CONFIGURATION OF SERVO CONTROL VALUES RANGE ======
 STEERING_MIN = 0
 STEERING_MAX = 100
 
 # ====== GLOBAL VARIABLES ======
 EMERGENCY_STOP_TIMEOUT_MS = 500
-BATTERY_MEASURE_EVERY_N_CYCLES = 1500
 
 # ====== INITIAL STATES ======
 INIT_STEERING = int(STEERING_MAX / 2)
@@ -134,7 +135,7 @@ class RcCar:
             try:
                 elapsed_ms = ticks_diff(ticks_ms(), self.last_action_time)
                 if elapsed_ms > EMERGENCY_STOP_TIMEOUT_MS:
-                    self.__reset()
+                    self.__stop()
 
                 self.__steer(self.steering)
 

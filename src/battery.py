@@ -12,4 +12,3 @@ class Battery:
         raw_value = self.adc.read_u16()
         voltage = raw_value * (3.3 / 65535) * 2
         return voltage
-
